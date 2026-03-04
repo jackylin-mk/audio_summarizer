@@ -136,7 +136,16 @@ python summarize_gdrive.py 1aBcDeFgHiJkL
 ```
 
 ### 注意事項
-- 同樣受 Whisper **25MB** 限制，超過會提示並中止
+- 檔案超過 **25MB 會自動分割**（每段 10 分鐘）後逐段轉錄，最後合併為完整逐字稿
+- 自動分割需要安裝 **ffmpeg**：
+
+  | 系統 | 安裝方式 |
+  |------|---------|
+  | macOS | `brew install ffmpeg` |
+  | Windows | 至 https://ffmpeg.org/download.html 下載並加入 PATH |
+  | Ubuntu | `sudo apt install ffmpeg` |
+
+- 未安裝 ffmpeg 且檔案超過 25MB 時，腳本會提示並中止
 - Drive 檔案需有「知道連結的人可以查看」權限，或已授權帳號有存取權
 
 ---
