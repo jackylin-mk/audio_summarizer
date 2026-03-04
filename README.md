@@ -92,11 +92,16 @@ python summarize_local.py meeting.mp3
 `mp3` / `mp4` / `m4a` / `wav` / `webm`（Whisper 支援的所有格式）
 
 ### 注意事項
-- 單檔上限 **25MB**（Whisper API 限制）
-- 超過 25MB 請先用 ffmpeg 分割：
-```bash
-ffmpeg -i input.mp3 -f segment -segment_time 600 -c copy chunk_%03d.mp3
-```
+- 檔案超過 **25MB 會自動分割**（每段 10 分鐘）後逐段轉錄，最後合併為完整逐字稿
+- 自動分割需要安裝 **ffmpeg**：
+
+  | 系統 | 安裝方式 |
+  |------|---------|
+  | macOS | `brew install ffmpeg` |
+  | Windows | 至 https://ffmpeg.org/download.html 下載並加入 PATH |
+  | Ubuntu | `sudo apt install ffmpeg` |
+
+- 未安裝 ffmpeg 且檔案超過 25MB 時，腳本會提示並中止
 
 ---
 
