@@ -1,6 +1,6 @@
 # 🎙️ 錄音摘要自動化工具
 
-透過 OpenAI Whisper 轉錄音訊、Claude API 生成結構化摘要，支援本地檔案與 Google Drive 兩種來源。
+透過 OpenAI Whisper 轉錄音訊、GPT-4o-mini 生成結構化摘要，支援本地檔案與 Google Drive 兩種來源。
 
 ---
 
@@ -16,7 +16,7 @@
 ## ⚙️ 環境需求
 
 - Python 3.8+
-- OpenAI API Key（用於 Whisper 轉錄 + GPT-4o-mini 摘要）
+- OpenAI API Key（用於 Whisper 轉錄）
 
 ---
 
@@ -33,19 +33,16 @@ pip install openai
 **macOS / Linux**
 ```bash
 export OPENAI_API_KEY=your_openai_api_key
-
 ```
 
 **Windows CMD**
 ```cmd
 set OPENAI_API_KEY=your_openai_api_key
-
 ```
 
 **Windows PowerShell**
 ```powershell
 $env:OPENAI_API_KEY="your_openai_api_key"
-
 ```
 
 **`.env` 檔案方式（推薦，永久生效）**
@@ -103,7 +100,7 @@ ffmpeg -i input.mp3 -f segment -segment_time 600 -c copy chunk_%03d.mp3
 ### 額外安裝
 
 ```bash
-pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib openai
+pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
 ```
 
 ### 前置設定：Google OAuth 憑證
@@ -146,7 +143,7 @@ python summarize_gdrive.py 1aBcDeFgHiJkL
 | 檔案 | 內容 |
 |------|------|
 | `檔名_transcript.txt` | Whisper 完整逐字稿 |
-| `檔名_summary.md` | Claude 結構化摘要 |
+| `檔名_summary.md` | GPT-4o-mini 結構化摘要 |
 
 ### 摘要格式範例
 
@@ -185,8 +182,6 @@ language="en"
 | OpenAI（Whisper） | https://platform.openai.com/api-keys |
 
 
-
-
 ---
 
 ## 💰 費用估算
@@ -202,7 +197,17 @@ Whisper 為**雲端 API**，無需在本機安裝任何模型，`pip install ope
 | GPT-4o-mini（輸出） | 約 1,000 tokens | $0.60 / 1M tokens | $0.0006 |
 | **合計** | | | **≈ $0.36（約台幣 12 元）** |
 
-> Whisper 轉錄費用佔大宗，Claude 摘要部分費用極低。
+> Whisper 轉錄費用佔大宗，GPT-4o-mini 摘要費用極低可忽略不計。
+
+### 腳本三（自動監控）額外費用
+
+腳本三每小時觸發一次，**只有偵測到新檔案時**才會呼叫 Whisper 和 GPT API，費用與上表相同。無新檔案時僅做 Drive 掃描，API 費用為 $0。
+
+| 項目 | 說明 | 費用 |
+|------|------|------|
+| 有新音訊（60 分鐘） | Whisper + GPT-4o-mini | ≈ $0.36 |
+| 無新音訊 | 僅 Drive API 掃描 | $0 |
+| GitHub Actions | 免費方案每月 2,000 分鐘 | $0 |
 
 ---
 
@@ -214,7 +219,7 @@ Whisper 為**雲端 API**，無需在本機安裝任何模型，`pip install ope
 每小時 GitHub Actions 觸發
   → 掃描指定 Drive 資料夾
   → 比對 processed_files.json（已處理清單）
-  → 發現新音訊 → 下載 → 自動分割（>25MB）→ Whisper 轉錄 → Claude 摘要
+  → 發現新音訊 → 下載 → 自動分割（>25MB）→ Whisper 轉錄 → GPT 摘要
   → 逐字稿 + 摘要上傳回同資料夾
   → 更新 processed_files.json
 ```
@@ -229,7 +234,7 @@ cat token.json
 
 ### 步驟二：設定 GitHub Secrets
 
-前往 GitHub Repo → **Settings → Secrets and variables → Actions**，新增以下三個 Secret：
+前往 GitHub Repo → **Settings → Secrets and variables → Actions**，新增以下四個 Secret：
 
 | Secret 名稱 | 內容 |
 |-------------|------|
@@ -260,7 +265,7 @@ watch_gdrive.py
 | 檔案 | 內容 |
 |------|------|
 | `檔名_transcript.txt` | Whisper 完整逐字稿 |
-| `檔名_summary.md` | Claude 結構化摘要 |
+| `檔名_summary.md` | GPT-4o-mini 結構化摘要 |
 | `processed_files.json` | 已處理清單（自動維護，請勿手動刪除） |
 
 ### GitHub Actions 免費額度
