@@ -16,8 +16,7 @@
 ## ⚙️ 環境需求
 
 - Python 3.8+
-- OpenAI API Key（用於 Whisper 轉錄）
-- Anthropic API Key（用於 Claude 摘要）
+- OpenAI API Key（用於 Whisper 轉錄 + GPT-4o-mini 摘要）
 
 ---
 
@@ -26,7 +25,7 @@
 ### 1. 安裝共用套件
 
 ```bash
-pip install openai anthropic
+pip install openai
 ```
 
 ### 2. 設定 API Key
@@ -34,19 +33,19 @@ pip install openai anthropic
 **macOS / Linux**
 ```bash
 export OPENAI_API_KEY=your_openai_api_key
-export ANTHROPIC_API_KEY=your_anthropic_api_key
+
 ```
 
 **Windows CMD**
 ```cmd
 set OPENAI_API_KEY=your_openai_api_key
-set ANTHROPIC_API_KEY=your_anthropic_api_key
+
 ```
 
 **Windows PowerShell**
 ```powershell
 $env:OPENAI_API_KEY="your_openai_api_key"
-$env:ANTHROPIC_API_KEY="your_anthropic_api_key"
+
 ```
 
 **`.env` 檔案方式（推薦，永久生效）**
@@ -59,7 +58,6 @@ pip install python-dotenv
 2. 在腳本同目錄建立 `.env` 檔案：
 ```env
 OPENAI_API_KEY=your_openai_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
 
 3. 在腳本開頭加入（兩個腳本皆適用）：
@@ -92,16 +90,11 @@ python summarize_local.py meeting.mp3
 `mp3` / `mp4` / `m4a` / `wav` / `webm`（Whisper 支援的所有格式）
 
 ### 注意事項
-- 檔案超過 **25MB 會自動分割**（每段 10 分鐘）後逐段轉錄，最後合併為完整逐字稿
-- 自動分割需要安裝 **ffmpeg**：
-
-  | 系統 | 安裝方式 |
-  |------|---------|
-  | macOS | `brew install ffmpeg` |
-  | Windows | 至 https://ffmpeg.org/download.html 下載並加入 PATH |
-  | Ubuntu | `sudo apt install ffmpeg` |
-
-- 未安裝 ffmpeg 且檔案超過 25MB 時，腳本會提示並中止
+- 單檔上限 **25MB**（Whisper API 限制）
+- 超過 25MB 請先用 ffmpeg 分割：
+```bash
+ffmpeg -i input.mp3 -f segment -segment_time 600 -c copy chunk_%03d.mp3
+```
 
 ---
 
@@ -110,7 +103,7 @@ python summarize_local.py meeting.mp3
 ### 額外安裝
 
 ```bash
-pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib openai
 ```
 
 ### 前置設定：Google OAuth 憑證
@@ -141,16 +134,7 @@ python summarize_gdrive.py 1aBcDeFgHiJkL
 ```
 
 ### 注意事項
-- 檔案超過 **25MB 會自動分割**（每段 10 分鐘）後逐段轉錄，最後合併為完整逐字稿
-- 自動分割需要安裝 **ffmpeg**：
-
-  | 系統 | 安裝方式 |
-  |------|---------|
-  | macOS | `brew install ffmpeg` |
-  | Windows | 至 https://ffmpeg.org/download.html 下載並加入 PATH |
-  | Ubuntu | `sudo apt install ffmpeg` |
-
-- 未安裝 ffmpeg 且檔案超過 25MB 時，腳本會提示並中止
+- 同樣受 Whisper **25MB** 限制，超過會提示並中止
 - Drive 檔案需有「知道連結的人可以查看」權限，或已授權帳號有存取權
 
 ---
@@ -199,9 +183,9 @@ language="en"
 | 服務 | 申請連結 |
 |------|---------|
 | OpenAI（Whisper） | https://platform.openai.com/api-keys |
-| Anthropic（Claude） | https://console.anthropic.com/ |
 
-> **注意：** Anthropic API 與 Claude Max 訂閱為獨立產品，訂閱費用不能抵 API 用量，需另外至 console.anthropic.com 儲值。
+
+
 
 ---
 
@@ -214,8 +198,76 @@ Whisper 為**雲端 API**，無需在本機安裝任何模型，`pip install ope
 | 項目 | 用量 | 單價 | 費用 |
 |------|------|------|------|
 | Whisper API | 60 分鐘 | $0.006 / 分鐘 | $0.36 |
-| Claude Sonnet（輸入） | 約 10,000 tokens | $3 / 1M tokens | $0.03 |
-| Claude Sonnet（輸出） | 約 1,000 tokens | $15 / 1M tokens | $0.015 |
-| **合計** | | | **≈ $0.41（約台幣 13 元）** |
+| GPT-4o-mini（輸入） | 約 10,000 tokens | $0.15 / 1M tokens | $0.0015 |
+| GPT-4o-mini（輸出） | 約 1,000 tokens | $0.60 / 1M tokens | $0.0006 |
+| **合計** | | | **≈ $0.36（約台幣 12 元）** |
 
 > Whisper 轉錄費用佔大宗，Claude 摘要部分費用極低。
+
+---
+
+## 🤖 腳本三：自動監控 Google Drive（GitHub Actions）
+
+### 流程
+
+```
+每小時 GitHub Actions 觸發
+  → 掃描指定 Drive 資料夾
+  → 比對 processed_files.json（已處理清單）
+  → 發現新音訊 → 下載 → 自動分割（>25MB）→ Whisper 轉錄 → Claude 摘要
+  → 逐字稿 + 摘要上傳回同資料夾
+  → 更新 processed_files.json
+```
+
+### 步驟一：取得 Google OAuth Token
+
+在**本機**執行一次 `summarize_gdrive.py` 完成授權，產生 `token.json`，然後將其內容複製備用：
+
+```bash
+cat token.json
+```
+
+### 步驟二：設定 GitHub Secrets
+
+前往 GitHub Repo → **Settings → Secrets and variables → Actions**，新增以下三個 Secret：
+
+| Secret 名稱 | 內容 |
+|-------------|------|
+| `OPENAI_API_KEY` | OpenAI API Key |
+| `GDRIVE_TOKEN_JSON` | `token.json` 的完整 JSON 內容（貼上整段） |
+| `GDRIVE_FOLDER_ID` | 要監控的 Drive 資料夾 ID |
+
+> **如何取得資料夾 ID？**
+> 在 Google Drive 開啟目標資料夾，網址列中 `folders/` 後面的字串即為資料夾 ID。
+> 例如：`https://drive.google.com/drive/folders/1aBcDeFgHiJkL` → ID 為 `1aBcDeFgHiJkL`
+
+### 步驟三：上傳檔案到 GitHub Repo
+
+確保 Repo 中包含：
+```
+watch_gdrive.py
+.github/workflows/watch.yml
+```
+
+### 步驟四：手動測試觸發
+
+前往 GitHub Repo → **Actions → 🎙️ Google Drive 錄音自動摘要 → Run workflow**，確認流程正常運作後，排程會每小時自動執行。
+
+### 輸出結果
+
+處理完成後，Drive 資料夾內會新增：
+
+| 檔案 | 內容 |
+|------|------|
+| `檔名_transcript.txt` | Whisper 完整逐字稿 |
+| `檔名_summary.md` | Claude 結構化摘要 |
+| `processed_files.json` | 已處理清單（自動維護，請勿手動刪除） |
+
+### GitHub Actions 免費額度
+
+| 方案 | 每月免費分鐘數 |
+|------|--------------|
+| 免費帳號 | 2,000 分鐘 |
+| Pro | 3,000 分鐘 |
+
+> 每次執行約 5–15 分鐘（視音訊長度），每小時觸發但無新檔時約 1 分鐘即結束，實際用量很低。
