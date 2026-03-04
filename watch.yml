@@ -1,0 +1,39 @@
+name: 🎙️ Google Drive 錄音自動摘要
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # 每小時整點執行
+  workflow_dispatch:        # 允許手動觸發（測試用）
+
+jobs:
+  watch-and-summarize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60     # 單次最長執行 60 分鐘
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ffmpeg
+        run: sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: |
+          pip install \
+            openai \
+            anthropic \
+            google-api-python-client \
+            google-auth-httplib2 \
+            google-auth-oauthlib
+
+      - name: Run watch script
+        env:
+          OPENAI_API_KEY:    ${{ secrets.OPENAI_API_KEY }}
+          GDRIVE_TOKEN_JSON: ${{ secrets.GDRIVE_TOKEN_JSON }}
+          GDRIVE_FOLDER_ID:  ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: python watch_gdrive.py
